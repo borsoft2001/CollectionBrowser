@@ -1,6 +1,7 @@
 import sqlite3
 import os
-from flask import Flask, render_template, request, jsonify, send_from_directory
+import urllib.parse
+from flask import Flask, render_template, request, jsonify, send_file, abort
 
 app = Flask(__name__)
 DB_PATH = "modellismo.db"
@@ -99,10 +100,14 @@ def search_files():
     - Logica OR sulle Sottocartelle di Primo Livello
     - Logica AND sui Tag di Contenuto
     """
-    query = request.args.get('q', '').strip()
+    query = request.args.get('q', '').strip() or request.args.get('search', '').strip()
     parents = request.args.getlist('parents')
     subs = request.args.getlist('subs')
     selected_tags = request.args.getlist('tags')
+
+    # Se 'tags' è passata come stringa separata da virgole (dal JS)
+    if len(selected_tags) == 1 and ',' in selected_tags[0]:
+        selected_tags = [t.strip() for t in selected_tags[0].split(',') if t.strip()]
 
     conn = get_db_connection()
     params = []
@@ -156,26 +161,40 @@ def search_files():
             ORDER BY t.name ASC
         """
         file_tags = conn.execute(tags_query, (file_dict['id'],)).fetchall()
-        file_dict['tags'] = [dict(t) for t in file_tags]
+        # Restituisce sia gli oggetti tag che un'array semplice di nomi
+        file_dict['tags'] = [t['name'] for t in file_tags]
         result.append(file_dict)
 
     conn.close()
     return jsonify(result)
 
-@app.route('/api/media')
+# Endpoint unico per servire media/anteprime e risolvere l'errore 404
+@app.route('/api/media', methods=['GET'])
+@app.route('/api/preview', methods=['GET'])
 def get_media():
-    """Streaming di immagini, PDF e video per le anteprime."""
-    filepath = request.args.get('filepath')
-    if filepath and os.path.exists(filepath):
-        directory = os.path.dirname(filepath)
-        filename = os.path.basename(filepath)
-        return send_from_directory(directory, filename)
-    return "File non trovato", 404
+    """Streaming sicuro di immagini e file locali, decodificando i caratteri speciali."""
+    # Accetta sia 'filepath' che 'path'
+    raw_path = request.args.get('filepath') or request.args.get('path', '')
+    
+    if not raw_path:
+        return abort(400, "Percorso mancante")
+
+    # Decodifica URL (%20 -> spazio, %24 -> $, ecc.)
+    decoded_path = urllib.parse.unquote(raw_path)
+    clean_path = os.path.normpath(decoded_path)
+
+    if not os.path.exists(clean_path) or not os.path.isfile(clean_path):
+        return "File non trovato", 404
+
+    try:
+        return send_file(clean_path)
+    except Exception as e:
+        return f"Errore apertura file: {e}", 500
 
 @app.route('/api/open', methods=['POST'])
 def open_file():
     """Apre il file direttamente nel sistema operativo locale."""
-    data = request.json
+    data = request.json or {}
     filepath = data.get('filepath')
     
     if filepath and os.path.exists(filepath):

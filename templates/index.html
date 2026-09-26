@@ -3,334 +3,504 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Archivio Modellismo</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+    <title>CollectionBrowser</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-    <!-- Header / Barra di Navigazione -->
-    <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-10 shadow-lg">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            <h1 class="text-xl font-bold text-amber-500 flex items-center gap-2">
-                🎨 Catalogatore Modellismo
-            </h1>
-            
-            <!-- Campo Ricerca Testuale -->
-            <div class="w-full md:w-1/2 relative">
-                <input type="text" id="searchInput" placeholder="Cerca nel nome file o nel percorso..." 
-                       class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR FILTRI */
+        #sidebar {
+            width: 340px;
+            background-color: #1e1e1e;
+            border-right: 1px solid #333;
+            padding: 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        #sidebar h2 {
+            font-size: 1.2rem;
+            color: #4da6ff;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .filter-group {
+            margin-bottom: 20px;
+        }
+
+        .filter-group h3 {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            outline: none;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"]:focus {
+            border-color: #4da6ff;
+        }
+
+        /* CONTENITORI SCELTA MULTIPLA (TAGS/BADGES) */
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+            background: #252525;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .tag-badge {
+            background-color: #333;
+            color: #ccc;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+        }
+
+        .tag-badge:hover {
+            background-color: #444;
+            color: #fff;
+        }
+
+        /* Badge Selezionati per i vari filtri */
+        .tag-badge.selected-parent {
+            background-color: #28a745;
+            color: #fff;
+        }
+
+        .tag-badge.selected-sub {
+            background-color: #e67e22;
+            color: #fff;
+        }
+
+        .tag-badge.selected-content {
+            background-color: #0066cc;
+            color: #fff;
+        }
+
+        .btn-reset {
+            width: 100%;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .btn-reset:hover {
+            background-color: #444;
+        }
+
+        /* AREA CONTENUTO PRINCIPALE */
+        #main-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #1e1e1e;
+            padding: 12px 20px;
+            border-radius: 6px;
+            border: 1px solid #333;
+        }
+
+        #file-count {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        /* GRIGLIA A COLONNE DINAMICHE */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        /* SCHEDA SINGOLA */
+        .card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: #4da6ff;
+        }
+
+        .card-preview {
+            width: 100%;
+            height: 180px;
+            background-color: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-preview .file-icon {
+            font-size: 2.2rem;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .card-body {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+            word-break: break-word;
+            line-height: 1.3;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: auto;
+            padding-top: 8px;
+        }
+
+        .card-tag {
+            font-size: 0.7rem;
+            background: #2a2a2a;
+            color: #888;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR FILTRI -->
+    <div id="sidebar">
+        <h2>CollectionBrowser</h2>
+
+        <!-- Ricerca Testuale -->
+        <div class="filter-group">
+            <h3>Cerca Nome File</h3>
+            <input type="text" id="search-input" placeholder="Es: Barbarian, Captain...">
+        </div>
+
+        <!-- Filtro 1: Cartelle Padre (OR - Scelta Multipla) -->
+        <div class="filter-group">
+            <h3>1. Cartelle Padre (OR)</h3>
+            <div id="parents-container" class="tags-container">
+                <!-- Badges caricate dinamicamente -->
             </div>
         </div>
-    </header>
 
-    <!-- Layout Principale -->
-    <div class="max-w-7xl mx-auto w-full flex-1 flex flex-col md:flex-row gap-6 p-6">
-        
-        <!-- Sidebar Filtri Gerarchici -->
-        <aside class="w-full md:w-80 bg-slate-800 p-4 rounded-xl border border-slate-700 h-fit max-h-[88vh] flex flex-col gap-4">
-            
-            <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-                <h2 class="font-semibold text-slate-300">Filtri a Cascata</h2>
-                <button onclick="resetFilters()" 
-                        class="text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 px-2 py-1 rounded transition">
-                    🗑️ Pulisci filtri
-                </button>
+        <!-- Filtro 2: Sotto-cartelle (OR - Scelta Multipla) -->
+        <div class="filter-group">
+            <h3>2. Sotto-cartelle (OR)</h3>
+            <div id="subs-container" class="tags-container">
+                <!-- Badges caricate dinamicamente -->
             </div>
+        </div>
 
-            <!-- SEZIONE 1: Cartella Padre (OR) -->
-            <div class="flex flex-col max-h-[22vh]">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">1. Cartella Padre (OR)</h3>
-                <div id="parentsContainer" class="overflow-y-auto flex-1 space-y-1 pr-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                    <!-- Popolato via JS -->
-                </div>
+        <!-- Filtro 3: Tag Contenuto (AND - Scelta Multipla) -->
+        <div class="filter-group">
+            <h3>3. Tag Contenuto (AND)</h3>
+            <div id="tags-container" class="tags-container">
+                <!-- Badges caricate dinamicamente -->
             </div>
+        </div>
 
-            <!-- SEZIONE 2: Primo Livello / Sottocartelle (OR) -->
-            <div class="flex flex-col max-h-[25vh]">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">2. Primo Livello (OR)</h3>
-                <div id="subsContainer" class="overflow-y-auto flex-1 space-y-1 pr-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                    <!-- Popolato via JS -->
-                </div>
-            </div>
-
-            <!-- SEZIONE 3: Tag Filtrati Dinamicamente (AND) -->
-            <div class="flex flex-col flex-1 max-h-[30vh]">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400">3. Tag Contenuto (AND)</h3>
-                    <span id="tagCountBadge" class="text-[10px] text-slate-400"></span>
-                </div>
-
-                <input type="text" id="tagFilterInput" oninput="filterTagsList()" placeholder="Filtra tag..." 
-                       class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-300 mb-2 focus:outline-none focus:border-amber-500">
-
-                <div id="tagsContainer" class="overflow-y-auto flex-1 space-y-1 pr-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                    <!-- Popolato via JS -->
-                </div>
-            </div>
-        </aside>
-
-        <!-- Area Griglia Risultati File -->
-        <main class="flex-1">
-            <div class="flex justify-between items-center mb-4">
-                <span id="resultsCount" class="text-xs font-semibold text-slate-400">0 file trovati</span>
-            </div>
-
-            <!-- Griglia Schede File -->
-            <div id="fileGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Inserimento dinamico card file -->
-            </div>
-        </main>
-
+        <button class="btn-reset" id="reset-filters">Azzera Filtri</button>
     </div>
 
-    <!-- Script Logica Frontend -->
+    <!-- AREA CONTENUTO PRINCIPALE -->
+    <div id="main-content">
+        <div id="top-bar">
+            <span id="file-count">Caricamento in corso...</span>
+        </div>
+
+        <!-- GRIGLIA SCHEDE DINAMICA -->
+        <div id="cards-grid" class="cards-grid">
+            <!-- Schede caricate dinamicamente -->
+        </div>
+    </div>
+
     <script>
+        // Set per contenere le selezioni multiple
         let selectedParents = new Set();
         let selectedSubs = new Set();
         let selectedTags = new Set();
-        let currentContentTags = [];
 
-        // 1. Carica le Cartelle Padre principali
+        document.addEventListener('DOMContentLoaded', () => {
+            loadParentFolders();
+            loadSubFolders();
+            loadContentTags();
+            fetchFiles();
+
+            // Event Listeners
+            document.getElementById('search-input').addEventListener('input', fetchFiles);
+            document.getElementById('reset-filters').addEventListener('click', resetFilters);
+        });
+
+        // 1. Carica Cartelle Padre (Scelta Multipla)
         async function loadParentFolders() {
             try {
                 const res = await fetch('/api/parent-folders');
                 const parents = await res.json();
-                const container = document.getElementById('parentsContainer');
-                
-                container.innerHTML = parents.map(p => `
-                    <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none py-0.5">
-                        <input type="checkbox" value="${p.id}" ${selectedParents.has(p.id) ? 'checked' : ''} onchange="toggleParent(${p.id})" 
-                               class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
-                        <span class="truncate font-mono text-amber-300/90">${p.name.replace('Padre: ', '')}</span>
-                    </label>
-                `).join('');
+                const container = document.getElementById('parents-container');
+                container.innerHTML = '';
+
+                parents.forEach(p => {
+                    const idStr = p.id.toString();
+                    const badge = document.createElement('span');
+                    badge.className = 'tag-badge';
+                    if (selectedParents.has(idStr)) badge.classList.add('selected-parent');
+                    badge.textContent = p.name.replace('Padre:', '').trim();
+                    
+                    badge.addEventListener('click', () => {
+                        if (selectedParents.has(idStr)) {
+                            selectedParents.delete(idStr);
+                            badge.classList.remove('selected-parent');
+                        } else {
+                            selectedParents.add(idStr);
+                            badge.classList.add('selected-parent');
+                        }
+                        loadSubFolders();
+                        loadContentTags();
+                        fetchFiles();
+                    });
+                    container.appendChild(badge);
+                });
             } catch (err) {
-                console.error("Errore nel caricamento cartelle padre:", err);
+                console.error("Errore caricamento cartelle padre:", err);
             }
         }
 
-        // 2. Carica le Sottocartelle di Primo Livello (filtrate per le Cartelle Padre attive in OR)
+        // 2. Carica Sotto-cartelle (Scelta Multipla - Filtrate in base alle Padre selezionate)
         async function loadSubFolders() {
             const params = new URLSearchParams();
-            selectedParents.forEach(id => params.append('parents', id));
+            selectedParents.forEach(pId => params.append('parents', pId));
 
             try {
                 const res = await fetch(`/api/sub-folders?${params.toString()}`);
                 const subs = await res.json();
+                const container = document.getElementById('subs-container');
+                container.innerHTML = '';
 
-                // Pulisce le sottocartelle selezionate non più valide
-                const validSubIds = new Set(subs.map(s => s.id));
-                selectedSubs.forEach(id => { if (!validSubIds.has(id)) selectedSubs.delete(id); });
+                subs.forEach(s => {
+                    const idStr = s.id.toString();
+                    const badge = document.createElement('span');
+                    badge.className = 'tag-badge';
+                    if (selectedSubs.has(idStr)) badge.classList.add('selected-sub');
+                    badge.textContent = s.name.replace('Sub:', '').trim();
 
-                const container = document.getElementById('subsContainer');
-                if (subs.length === 0) {
-                    container.innerHTML = `<div class="text-[11px] text-slate-500 py-2 text-center">Nessuna sottocartella</div>`;
-                    return;
-                }
-
-                container.innerHTML = subs.map(s => `
-                    <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none py-0.5">
-                        <input type="checkbox" value="${s.id}" ${selectedSubs.has(s.id) ? 'checked' : ''} onchange="toggleSub(${s.id})" 
-                               class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
-                        <span class="truncate font-mono">${s.name.replace('Sub: ', '')}</span>
-                    </label>
-                `).join('');
+                    badge.addEventListener('click', () => {
+                        if (selectedSubs.has(idStr)) {
+                            selectedSubs.delete(idStr);
+                            badge.classList.remove('selected-sub');
+                        } else {
+                            selectedSubs.add(idStr);
+                            badge.classList.add('selected-sub');
+                        }
+                        loadContentTags();
+                        fetchFiles();
+                    });
+                    container.appendChild(badge);
+                });
             } catch (err) {
-                console.error("Errore nel caricamento sottocartelle:", err);
+                console.error("Errore caricamento sottocartelle:", err);
             }
         }
 
-        // 3. Carica i Tag di contenuto presenti SOLO nelle cartelle e sottocartelle selezionate
+        // 3. Carica Tag Contenuto (Scelta Multipla)
         async function loadContentTags() {
             const params = new URLSearchParams();
-            selectedParents.forEach(id => params.append('parents', id));
-            selectedSubs.forEach(id => params.append('subs', id));
+            selectedParents.forEach(pId => params.append('parents', pId));
+            selectedSubs.forEach(sId => params.append('subs', sId));
 
             try {
                 const res = await fetch(`/api/content-tags?${params.toString()}`);
-                currentContentTags = await res.json();
-                
-                const validTagIds = new Set(currentContentTags.map(t => t.id));
-                selectedTags.forEach(id => { if (!validTagIds.has(id)) selectedTags.delete(id); });
+                const tags = await res.json();
+                const container = document.getElementById('tags-container');
+                container.innerHTML = '';
 
-                document.getElementById('tagCountBadge').innerText = `${currentContentTags.length} tag`;
-                renderTags(currentContentTags);
+                tags.forEach(t => {
+                    const idStr = t.id.toString();
+                    const badge = document.createElement('span');
+                    badge.className = 'tag-badge';
+                    if (selectedTags.has(idStr)) badge.classList.add('selected-content');
+                    badge.textContent = t.name;
+
+                    badge.addEventListener('click', () => {
+                        if (selectedTags.has(idStr)) {
+                            selectedTags.delete(idStr);
+                            badge.classList.remove('selected-content');
+                        } else {
+                            selectedTags.add(idStr);
+                            badge.classList.add('selected-content');
+                        }
+                        fetchFiles();
+                    });
+                    container.appendChild(badge);
+                });
             } catch (err) {
-                console.error("Errore nel caricamento dei tag di contenuto:", err);
+                console.error("Errore caricamento tag contenuto:", err);
             }
         }
 
-        function renderTags(tags) {
-            const container = document.getElementById('tagsContainer');
-            if (tags.length === 0) {
-                container.innerHTML = `<div class="text-[11px] text-slate-500 py-2 text-center">Nessun tag disponibile</div>`;
-                return;
-            }
+        // Recupera ed elenca i file filtrati aprendo la query string con più parametri
+        async function fetchFiles() {
+            const query = document.getElementById('search-input').value.trim();
 
-            container.innerHTML = tags.map(t => {
-                const isChecked = selectedTags.has(t.id) ? 'checked' : '';
-                return `
-                    <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none py-0.5">
-                        <input type="checkbox" value="${t.id}" ${isChecked} onchange="toggleTag(${t.id})" 
-                               class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
-                        <span class="truncate">${t.name}</span>
-                    </label>
-                `;
-            }).join('');
-        }
-
-        function filterTagsList() {
-            const query = document.getElementById('tagFilterInput').value.toLowerCase();
-            const filtered = currentContentTags.filter(t => t.name.toLowerCase().includes(query));
-            renderTags(filtered);
-        }
-
-        // Gestione selezioni a cascata
-        function toggleParent(parentId) {
-            if (selectedParents.has(parentId)) selectedParents.delete(parentId);
-            else selectedParents.add(parentId);
-            
-            loadSubFolders();
-            loadContentTags();
-            searchFiles();
-        }
-
-        function toggleSub(subId) {
-            if (selectedSubs.has(subId)) selectedSubs.delete(subId);
-            else selectedSubs.add(subId);
-            
-            loadContentTags();
-            searchFiles();
-        }
-
-        function toggleTag(tagId) {
-            if (selectedTags.has(tagId)) selectedTags.delete(tagId);
-            else selectedTags.add(tagId);
-            
-            searchFiles();
-        }
-
-        function resetFilters() {
-            selectedParents.clear();
-            selectedSubs.clear();
-            selectedTags.clear();
-            
-            document.getElementById('searchInput').value = '';
-            document.getElementById('tagFilterInput').value = '';
-            
-            loadParentFolders();
-            loadSubFolders();
-            loadContentTags();
-            searchFiles();
-        }
-
-        // Esecuzione ricerca file e rendering griglia
-        async function searchFiles() {
-            const query = document.getElementById('searchInput').value;
             const params = new URLSearchParams();
-            
             if (query) params.append('q', query);
-            selectedParents.forEach(id => params.append('parents', id));
-            selectedSubs.forEach(id => params.append('subs', id));
-            selectedTags.forEach(id => params.append('tags', id));
+            
+            selectedParents.forEach(pId => params.append('parents', pId));
+            selectedSubs.forEach(sId => params.append('subs', sId));
+            selectedTags.forEach(tId => params.append('tags', tId));
 
             try {
                 const res = await fetch(`/api/files?${params.toString()}`);
                 const files = await res.json();
-                
-                document.getElementById('resultsCount').innerText = `${files.length} file trovati`;
-                
-                const grid = document.getElementById('fileGrid');
-                if (files.length === 0) {
-                    grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">Nessun file rispetta i criteri selezionati.</div>`;
-                    return;
-                }
-
-                grid.innerHTML = files.map(file => {
-                    const ext = (file.file_type || '').toLowerCase();
-                    const mediaUrl = `/api/media?filepath=${encodeURIComponent(file.filepath)}`;
-                    
-                    let previewHtml = '';
-                    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
-                        previewHtml = `
-                            <div class="w-full h-40 bg-slate-900 rounded-lg overflow-hidden mb-3 border border-slate-700/50 flex items-center justify-center">
-                                <img src="${mediaUrl}" alt="${file.filename}" class="w-full h-full object-cover hover:scale-105 transition duration-300" loading="lazy">
-                            </div>`;
-                    } else if (['mp4', 'mkv', 'webm'].includes(ext)) {
-                        previewHtml = `
-                            <div class="w-full h-40 bg-slate-900 rounded-lg overflow-hidden mb-3 border border-slate-700/50 flex items-center justify-center relative">
-                                <video src="${mediaUrl}" class="w-full h-full object-cover" preload="metadata" 
-                                       onmouseover="this.play()" onmouseout="this.pause(); this.currentTime=0;" muted></video>
-                                <span class="absolute top-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded">🎬 Video</span>
-                            </div>`;
-                    } else if (ext === 'pdf') {
-                        previewHtml = `
-                            <div class="w-full h-40 bg-slate-900 rounded-lg overflow-hidden mb-3 border border-slate-700/50 flex flex-col items-center justify-center gap-2">
-                                <span class="text-3xl">📄</span>
-                                <span class="text-xs text-slate-400 font-semibold uppercase">Documento PDF</span>
-                            </div>`;
-                    } else {
-                        previewHtml = `
-                            <div class="w-full h-24 bg-slate-900/50 rounded-lg mb-3 border border-slate-700/30 flex items-center justify-center">
-                                <span class="text-2xl opacity-40">📁</span>
-                            </div>`;
-                    }
-
-                    return `
-                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition shadow">
-                            <div>
-                                ${previewHtml}
-
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-700 text-amber-400">
-                                        ${file.file_type || 'FILE'}
-                                    </span>
-                                    <span class="text-[10px] text-slate-400">${(file.size_bytes / (1024*1024)).toFixed(1)} MB</span>
-                                </div>
-                                <h3 class="font-medium text-sm text-slate-200 line-clamp-2 mb-2" title="${file.filename}">
-                                    ${file.filename}
-                                </h3>
-                            </div>
-
-                            <div>
-                                <div class="flex flex-wrap gap-1 mb-3 max-h-16 overflow-y-auto">
-                                    ${file.tags.map(t => {
-                                        let badgeStyle = 'bg-slate-900 text-slate-400 border-slate-700';
-                                        if (t.name.startsWith('Padre:')) badgeStyle = 'bg-amber-950/60 text-amber-300 border-amber-800/60';
-                                        else if (t.name.startsWith('Sub:')) badgeStyle = 'bg-blue-950/60 text-blue-300 border-blue-800/60';
-                                        return `<span class="text-[9px] ${badgeStyle} px-1.5 py-0.5 rounded border">${t.name}</span>`;
-                                    }).join('')}
-                                </div>
-
-                                <button onclick="openFile('${file.filepath.replace(/\\/g, '\\\\')}')" 
-                                        class="w-full bg-slate-700 hover:bg-amber-600 text-white text-xs font-semibold py-1.5 rounded transition flex items-center justify-center gap-1">
-                                    📂 Apri nel Computer
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                renderCards(files);
             } catch (err) {
-                console.error("Errore nella ricerca dei file:", err);
+                console.error("Errore recupero file:", err);
             }
         }
 
-        async function openFile(filepath) {
-            await fetch('/api/open', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filepath: filepath })
+        // Renderizza le schede nella griglia dinamica
+        function renderCards(files) {
+            const grid = document.getElementById('cards-grid');
+            const countLabel = document.getElementById('file-count');
+            grid.innerHTML = '';
+
+            countLabel.textContent = `Trovati ${files.length} file`;
+
+            if (files.length === 0) {
+                grid.innerHTML = '<p style="color: #666; grid-column: 1/-1; text-align: center; padding: 40px;">Nessun file trovato con i filtri selezionati.</p>';
+                return;
+            }
+
+            files.forEach(file => {
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                // Doppio click per aprire il file nel sistema locale
+                card.addEventListener('dblclick', () => openFile(file.filepath));
+
+                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes((file.file_type || '').toLowerCase());
+                let previewHtml = '';
+
+                if (isImage) {
+                    previewHtml = `<img src="/api/media?filepath=${encodeURIComponent(file.filepath)}" alt="${file.filename}" loading="lazy">`;
+                } else {
+                    previewHtml = `<span class="file-icon">${file.file_type || 'FILE'}</span>`;
+                }
+
+                const tagsHtml = (file.tags || [])
+                    .map(t => `<span class="card-tag">${typeof t === 'object' ? t.name : t}</span>`)
+                    .join('');
+
+                card.innerHTML = `
+                    <div class="card-preview">
+                        ${previewHtml}
+                    </div>
+                    <div class="card-body">
+                        <div class="card-title" title="${file.filepath}">${file.filename}</div>
+                        <div class="card-tags">
+                            ${tagsHtml}
+                        </div>
+                    </div>
+                `;
+
+                grid.appendChild(card);
             });
         }
 
-        document.getElementById('searchInput').addEventListener('input', () => searchFiles());
+        // Apre il file nel SO locale
+        async function openFile(filepath) {
+            try {
+                await fetch('/api/open', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filepath: filepath })
+                });
+            } catch (err) {
+                console.error("Errore apertura file:", err);
+            }
+        }
 
-        // Inizializzazione
-        loadParentFolders();
-        loadSubFolders();
-        loadContentTags();
-        searchFiles();
+        // Azzera tutti i filtri selezionati
+        function resetFilters() {
+            document.getElementById('search-input').value = '';
+            selectedParents.clear();
+            selectedSubs.clear();
+            selectedTags.clear();
+
+            loadParentFolders();
+            loadSubFolders();
+            loadContentTags();
+            fetchFiles();
+        }
     </script>
 </body>
 </html>
