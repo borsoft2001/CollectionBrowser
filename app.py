@@ -2,7 +2,6 @@ import sqlite3
 import os
 import urllib.parse
 from flask import Flask, render_template, request, jsonify, send_file, abort
-import mimetypes
 
 app = Flask(__name__)
 DB_PATH = "modellismo.db"
