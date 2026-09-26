@@ -127,8 +127,36 @@ TAG_MAPPING = {
 
 
 # ==========================================
-# 2. FUNZIONI DI ESTRAZIONE LIVELLI E TAG
+# 2. ESTRAZIONE TAG E LETTURA CONFIGURAZIONE
 # ==========================================
+def load_or_create_folders_config(config_path="cartelle.txt"):
+    """
+    Legge le cartelle dal file di testo. 
+    Se il file non esiste, lo crea con i percorsi di default.
+    """
+    default_folders = [
+        r"E:\Wargames\Sezione Modellismo\01 Pittura",
+        r"E:\Wargames\Sezione Modellismo\80 Miniature 40K"
+    ]
+
+    if not os.path.exists(config_path):
+        print(f"File '{config_path}' non trovato. Creazione in corso con i percorsi di default...")
+        with open(config_path, "w", encoding="utf-8") as f:
+            for folder in default_folders:
+                f.write(folder + "\n")
+        return default_folders
+
+    folders = []
+    with open(config_path, "r", encoding="utf-8") as f:
+        for line in f:
+            path = line.strip()
+            # Ignora righe vuote o commenti che iniziano con #
+            if path and not path.startswith("#"):
+                folders.append(path)
+
+    return folders
+
+
 def extract_folder_levels(file_path, target_folders):
     """Estrae la Cartella Padre (Livello 0) e il Primo Livello di sottocartella (Livello 1)."""
     tags = set()
@@ -156,7 +184,6 @@ def extract_content_tags(file_path):
     """Analizza il file per estrarre SOLO i tag presenti nella mappatura TAG_MAPPING."""
     tags = set()
 
-    # Estragga esclusivamente i tag definiti nelle RegEx di TAG_MAPPING
     for tag_name, patterns in TAG_MAPPING.items():
         for pattern in patterns:
             if re.search(pattern, file_path, re.IGNORECASE):
@@ -277,9 +304,12 @@ def scan_and_populate_db(folders_to_scan, db_path="modellismo.db"):
 # 4. MAIN
 # ==========================================
 if __name__ == "__main__":
-    TARGET_FOLDERS = [
-        r"E:\\Wargames\\Sezione Modellismo\\01 Pittura",
-        r"E:\\Wargames\\Sezione Modellismo\\80 Miniature 40K"
-    ]
+    # Carica le cartelle da "cartelle.txt" (lo crea se non esiste)
+    target_folders = load_or_create_folders_config("cartelle.txt")
+    
+    print("Cartelle lette dalla configurazione:")
+    for path in target_folders:
+        print(f" - {path}")
+    print("-" * 40)
 
-    scan_and_populate_db(TARGET_FOLDERS, db_path="modellismo.db")
+    scan_and_populate_db(target_folders, db_path="modellismo.db")
