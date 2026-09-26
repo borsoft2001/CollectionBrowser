@@ -1,6 +1,7 @@
 # progetto local settings
-*.db
-*.txt
+modellismo.db
+cartelle.txt
+tag_mapping.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
