@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archivio Modellismo</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header / Barra di Navigazione -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-10 shadow-lg">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <h1 class="text-xl font-bold text-amber-500 flex items-center gap-2">
+                🎨 Catalogatore Modellismo
+            </h1>
+            
+            <!-- Campo Ricerca Testuale -->
+            <div class="w-full md:w-1/2 relative">
+                <input type="text" id="searchInput" placeholder="Cerca nel nome file o nel percorso..." 
+                       class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+            </div>
+        </div>
+    </header>
+
+    <!-- Layout Principale -->
+    <div class="max-w-7xl mx-auto w-full flex-1 flex flex-col md:flex-row gap-6 p-6">
+        
+        <!-- Sidebar Filtri Gerarchici -->
+        <aside class="w-full md:w-80 bg-slate-800 p-4 rounded-xl border border-slate-700 h-fit max-h-[88vh] flex flex-col gap-4">
+            
+            <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+                <h2 class="font-semibold text-slate-300">Filtri a Cascata</h2>
+                <button onclick="resetFilters()" 
+                        class="text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 px-2 py-1 rounded transition">
+                    🗑️ Pulisci filtri
+                </button>
+            </div>
+
+            <!-- SEZIONE 1: Cartella Padre (OR) -->
+            <div class="flex flex-col max-h-[22vh]">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">1. Cartella Padre (OR)</h3>
+                <div id="parentsContainer" class="overflow-y-auto flex-1 space-y-1 pr-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                    <!-- Popolato via JS -->
+                </div>
+            </div>
+
+            <!-- SEZIONE 2: Primo Livello / Sottocartelle (OR) -->
+            <div class="flex flex-col max-h-[25vh]">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">2. Primo Livello (OR)</h3>
+                <div id="subsContainer" class="overflow-y-auto flex-1 space-y-1 pr-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                    <!-- Popolato via JS -->
+                </div>
+            </div>
+
+            <!-- SEZIONE 3: Tag Filtrati Dinamicamente (AND) -->
+            <div class="flex flex-col flex-1 max-h-[30vh]">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400">3. Tag Contenuto (AND)</h3>
+                    <span id="tagCountBadge" class="text-[10px] text-slate-400"></span>
+                </div>
+
+                <input type="text" id="tagFilterInput" oninput="filterTagsList()" placeholder="Filtra tag..." 
+                       class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-300 mb-2 focus:outline-none focus:border-amber-500">
+
+                <div id="tagsContainer" class="overflow-y-auto flex-1 space-y-1 pr-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                    <!-- Popolato via JS -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Area Griglia Risultati File -->
+        <main class="flex-1">
+            <div class="flex justify-between items-center mb-4">
+                <span id="resultsCount" class="text-xs font-semibold text-slate-400">0 file trovati</span>
+            </div>
+
+            <!-- Griglia Schede File -->
+            <div id="fileGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Inserimento dinamico card file -->
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Script Logica Frontend -->
+    <script>
+        let selectedParents = new Set();
+        let selectedSubs = new Set();
+        let selectedTags = new Set();
+        let currentContentTags = [];
+
+        // 1. Carica le Cartelle Padre principali
+        async function loadParentFolders() {
+            try {
+                const res = await fetch('/api/parent-folders');
+                const parents = await res.json();
+                const container = document.getElementById('parentsContainer');
+                
+                container.innerHTML = parents.map(p => `
+                    <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none py-0.5">
+                        <input type="checkbox" value="${p.id}" ${selectedParents.has(p.id) ? 'checked' : ''} onchange="toggleParent(${p.id})" 
+                               class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
+                        <span class="truncate font-mono text-amber-300/90">${p.name.replace('Padre: ', '')}</span>
+                    </label>
+                `).join('');
+            } catch (err) {
+                console.error("Errore nel caricamento cartelle padre:", err);
+            }
+        }
+
+        // 2. Carica le Sottocartelle di Primo Livello (filtrate per le Cartelle Padre attive in OR)
+        async function loadSubFolders() {
+            const params = new URLSearchParams();
+            selectedParents.forEach(id => params.append('parents', id));
+
+            try {
+                const res = await fetch(`/api/sub-folders?${params.toString()}`);
+                const subs = await res.json();
+
+                // Pulisce le sottocartelle selezionate non più valide
+                const validSubIds = new Set(subs.map(s => s.id));
+                selectedSubs.forEach(id => { if (!validSubIds.has(id)) selectedSubs.delete(id); });
+
+                const container = document.getElementById('subsContainer');
+                if (subs.length === 0) {
+                    container.innerHTML = `<div class="text-[11px] text-slate-500 py-2 text-center">Nessuna sottocartella</div>`;
+                    return;
+                }
+
+                container.innerHTML = subs.map(s => `
+                    <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none py-0.5">
+                        <input type="checkbox" value="${s.id}" ${selectedSubs.has(s.id) ? 'checked' : ''} onchange="toggleSub(${s.id})" 
+                               class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
+                        <span class="truncate font-mono">${s.name.replace('Sub: ', '')}</span>
+                    </label>
+                `).join('');
+            } catch (err) {
+                console.error("Errore nel caricamento sottocartelle:", err);
+            }
+        }
+
+        // 3. Carica i Tag di contenuto presenti SOLO nelle cartelle e sottocartelle selezionate
+        async function loadContentTags() {
+            const params = new URLSearchParams();
+            selectedParents.forEach(id => params.append('parents', id));
+            selectedSubs.forEach(id => params.append('subs', id));
+
+            try {
+                const res = await fetch(`/api/content-tags?${params.toString()}`);
+                currentContentTags = await res.json();
+                
+                const validTagIds = new Set(currentContentTags.map(t => t.id));
+                selectedTags.forEach(id => { if (!validTagIds.has(id)) selectedTags.delete(id); });
+
+                document.getElementById('tagCountBadge').innerText = `${currentContentTags.length} tag`;
+                renderTags(currentContentTags);
+            } catch (err) {
+                console.error("Errore nel caricamento dei tag di contenuto:", err);
+            }
+        }
+
+        function renderTags(tags) {
+            const container = document.getElementById('tagsContainer');
+            if (tags.length === 0) {
+                container.innerHTML = `<div class="text-[11px] text-slate-500 py-2 text-center">Nessun tag disponibile</div>`;
+                return;
+            }
+
+            container.innerHTML = tags.map(t => {
+                const isChecked = selectedTags.has(t.id) ? 'checked' : '';
+                return `
+                    <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none py-0.5">
+                        <input type="checkbox" value="${t.id}" ${isChecked} onchange="toggleTag(${t.id})" 
+                               class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
+                        <span class="truncate">${t.name}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function filterTagsList() {
+            const query = document.getElementById('tagFilterInput').value.toLowerCase();
+            const filtered = currentContentTags.filter(t => t.name.toLowerCase().includes(query));
+            renderTags(filtered);
+        }
+
+        // Gestione selezioni a cascata
+        function toggleParent(parentId) {
+            if (selectedParents.has(parentId)) selectedParents.delete(parentId);
+            else selectedParents.add(parentId);
+            
+            loadSubFolders();
+            loadContentTags();
+            searchFiles();
+        }
+
+        function toggleSub(subId) {
+            if (selectedSubs.has(subId)) selectedSubs.delete(subId);
+            else selectedSubs.add(subId);
+            
+            loadContentTags();
+            searchFiles();
+        }
+
+        function toggleTag(tagId) {
+            if (selectedTags.has(tagId)) selectedTags.delete(tagId);
+            else selectedTags.add(tagId);
+            
+            searchFiles();
+        }
+
+        function resetFilters() {
+            selectedParents.clear();
+            selectedSubs.clear();
+            selectedTags.clear();
+            
+            document.getElementById('searchInput').value = '';
+            document.getElementById('tagFilterInput').value = '';
+            
+            loadParentFolders();
+            loadSubFolders();
+            loadContentTags();
+            searchFiles();
+        }
+
+        // Esecuzione ricerca file e rendering griglia
+        async function searchFiles() {
+            const query = document.getElementById('searchInput').value;
+            const params = new URLSearchParams();
+            
+            if (query) params.append('q', query);
+            selectedParents.forEach(id => params.append('parents', id));
+            selectedSubs.forEach(id => params.append('subs', id));
+            selectedTags.forEach(id => params.append('tags', id));
+
+            try {
+                const res = await fetch(`/api/files?${params.toString()}`);
+                const files = await res.json();
+                
+                document.getElementById('resultsCount').innerText = `${files.length} file trovati`;
+                
+                const grid = document.getElementById('fileGrid');
+                if (files.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">Nessun file rispetta i criteri selezionati.</div>`;
+                    return;
+                }
+
+                grid.innerHTML = files.map(file => {
+                    const ext = (file.file_type || '').toLowerCase();
+                    const mediaUrl = `/api/media?filepath=${encodeURIComponent(file.filepath)}`;
+                    
+                    let previewHtml = '';
+                    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
+                        previewHtml = `
+                            <div class="w-full h-40 bg-slate-900 rounded-lg overflow-hidden mb-3 border border-slate-700/50 flex items-center justify-center">
+                                <img src="${mediaUrl}" alt="${file.filename}" class="w-full h-full object-cover hover:scale-105 transition duration-300" loading="lazy">
+                            </div>`;
+                    } else if (['mp4', 'mkv', 'webm'].includes(ext)) {
+                        previewHtml = `
+                            <div class="w-full h-40 bg-slate-900 rounded-lg overflow-hidden mb-3 border border-slate-700/50 flex items-center justify-center relative">
+                                <video src="${mediaUrl}" class="w-full h-full object-cover" preload="metadata" 
+                                       onmouseover="this.play()" onmouseout="this.pause(); this.currentTime=0;" muted></video>
+                                <span class="absolute top-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded">🎬 Video</span>
+                            </div>`;
+                    } else if (ext === 'pdf') {
+                        previewHtml = `
+                            <div class="w-full h-40 bg-slate-900 rounded-lg overflow-hidden mb-3 border border-slate-700/50 flex flex-col items-center justify-center gap-2">
+                                <span class="text-3xl">📄</span>
+                                <span class="text-xs text-slate-400 font-semibold uppercase">Documento PDF</span>
+                            </div>`;
+                    } else {
+                        previewHtml = `
+                            <div class="w-full h-24 bg-slate-900/50 rounded-lg mb-3 border border-slate-700/30 flex items-center justify-center">
+                                <span class="text-2xl opacity-40">📁</span>
+                            </div>`;
+                    }
+
+                    return `
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition shadow">
+                            <div>
+                                ${previewHtml}
+
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-700 text-amber-400">
+                                        ${file.file_type || 'FILE'}
+                                    </span>
+                                    <span class="text-[10px] text-slate-400">${(file.size_bytes / (1024*1024)).toFixed(1)} MB</span>
+                                </div>
+                                <h3 class="font-medium text-sm text-slate-200 line-clamp-2 mb-2" title="${file.filename}">
+                                    ${file.filename}
+                                </h3>
+                            </div>
+
+                            <div>
+                                <div class="flex flex-wrap gap-1 mb-3 max-h-16 overflow-y-auto">
+                                    ${file.tags.map(t => {
+                                        let badgeStyle = 'bg-slate-900 text-slate-400 border-slate-700';
+                                        if (t.name.startsWith('Padre:')) badgeStyle = 'bg-amber-950/60 text-amber-300 border-amber-800/60';
+                                        else if (t.name.startsWith('Sub:')) badgeStyle = 'bg-blue-950/60 text-blue-300 border-blue-800/60';
+                                        return `<span class="text-[9px] ${badgeStyle} px-1.5 py-0.5 rounded border">${t.name}</span>`;
+                                    }).join('')}
+                                </div>
+
+                                <button onclick="openFile('${file.filepath.replace(/\\/g, '\\\\')}')" 
+                                        class="w-full bg-slate-700 hover:bg-amber-600 text-white text-xs font-semibold py-1.5 rounded transition flex items-center justify-center gap-1">
+                                    📂 Apri nel Computer
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Errore nella ricerca dei file:", err);
+            }
+        }
+
+        async function openFile(filepath) {
+            await fetch('/api/open', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filepath: filepath })
+            });
+        }
+
+        document.getElementById('searchInput').addEventListener('input', () => searchFiles());
+
+        // Inizializzazione
+        loadParentFolders();
+        loadSubFolders();
+        loadContentTags();
+        searchFiles();
+    </script>
+</body>
+</html>
