@@ -38,6 +38,11 @@ OLLAMA_AVAILABLE = False
 def check_ollama_status():
     """Verifica una sola volta se Ollama è attivo e raggiungibile."""
     global OLLAMA_AVAILABLE
+    
+    # Codici colore ANSI per il terminale
+    YELLOW = "\033[93m"
+    RESET = "\033[0m"
+
     try:
         # Timeout rapido a 1.0 secondo per non rallentare l'avvio
         response = requests.get(f"{OLLAMA_URL}/api/version", timeout=1.0)
@@ -49,7 +54,7 @@ def check_ollama_status():
         pass
 
     OLLAMA_AVAILABLE = False
-    print("[AVVISO] Ollama non è in esecuzione o non risponde. Verrà utilizzato solo il file 'tag_mapping.json' locale.")
+    print(f"{YELLOW}[AVVISO] Ollama non è in esecuzione o non risponde. Verrà utilizzato solo il file 'tag_mapping.json' locale.{RESET}")
     return False
 
 
